@@ -31,3 +31,4 @@ class NearbyMatch:
     overlap: timedelta = timedelta(0)
     start_gap: timedelta = timedelta(0)
     priority_label: str = "nearby gap"
+    badminton_spots_available: int | None = None

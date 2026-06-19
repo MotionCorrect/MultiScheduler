@@ -114,6 +114,37 @@ def test_find_nearby_pairs_prioritizes_dropoff_friendly_overlaps() -> None:
     assert matches[1].gap == timedelta(hours=1)
 
 
+def test_find_nearby_pairs_favors_fewer_badminton_spots_when_timing_ties() -> None:
+    swim = ActivityEvent(
+        source="lane_swim",
+        name="Lane Swim",
+        start=datetime(2026, 6, 20, 10, 0),
+        end=datetime(2026, 6, 20, 11, 0),
+        location="Pool",
+    )
+    scarce_badminton = ActivityEvent(
+        source="badminton",
+        name="Scarce badminton",
+        start=datetime(2026, 6, 20, 10, 15),
+        end=datetime(2026, 6, 20, 11, 15),
+        location="Gym",
+        spots="2 spots left",
+    )
+    open_badminton = ActivityEvent(
+        source="badminton",
+        name="Open badminton",
+        start=datetime(2026, 6, 20, 10, 15),
+        end=datetime(2026, 6, 20, 11, 15),
+        location="Gym",
+        spots="20 spots left",
+    )
+
+    matches = find_nearby_pairs([swim], [open_badminton, scarce_badminton], max_gap=timedelta(hours=2))
+
+    assert matches[0].second == scarce_badminton
+    assert matches[0].badminton_spots_available == 2
+
+
 def test_upcoming_window_defaults_to_next_seven_days() -> None:
     start, end = upcoming_window(now=datetime(2026, 6, 19, 2, 0), days=7)
 

@@ -41,8 +41,9 @@ Output:
 Pairing priority:
 
 - Results are filtered by default to starts less than 1.5 hours apart for drop-off/use-the-other-activity scenarios.
-- Actual time overlaps appear first, then longer overlaps, then smaller start-time gaps, then smaller event gaps/distance.
-- Each report shows the priority label, event gap, start-time gap, overlap duration, and distance where coordinates are available.
+- Actual time overlaps appear first, then longer overlaps, then smaller start-time gaps, then smaller event gaps, fewer badminton spots left, and distance.
+- Each report shows the priority label, event gap, start-time gap, overlap duration, distance, and badminton spots where available.
+- The HTML report includes client-side exploration controls: calendar/date chooser, sort by best fit, sort by fewest badminton spots, sort by closest start times, and sort by closest centres.
 
 Credentials:
 

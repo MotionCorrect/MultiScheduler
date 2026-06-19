@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import re
 
 from .geo import haversine_km
 from .models import ActivityEvent, NearbyMatch
@@ -68,6 +69,7 @@ def find_nearby_pairs(
                     overlap=overlap,
                     start_gap=start_gap,
                     priority_label=_priority_label(overlap, gap),
+                    badminton_spots_available=available_spots(second),
                 )
             )
     return sorted(matches, key=_priority_key)
@@ -79,14 +81,23 @@ def event_distance_km(first: ActivityEvent, second: ActivityEvent) -> float | No
     return round(haversine_km(first.latitude, first.longitude, second.latitude, second.longitude), 3)
 
 
+def available_spots(event: ActivityEvent) -> int | None:
+    if not event.spots:
+        return None
+    match = re.search(r"\d+", event.spots)
+    return int(match.group(0)) if match else None
+
+
 def _priority_key(match: NearbyMatch) -> tuple:
     has_overlap = match.overlap > timedelta(0)
     distance = match.distance_km if match.distance_km is not None else 9999.0
+    badminton_spots = match.badminton_spots_available if match.badminton_spots_available is not None else 9999
     return (
         0 if has_overlap else 1,
         -int(match.overlap.total_seconds()),
         int(match.start_gap.total_seconds()),
         int(match.gap.total_seconds()),
+        badminton_spots,
         distance,
         match.first.start,
         match.second.start,

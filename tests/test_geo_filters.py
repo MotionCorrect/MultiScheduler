@@ -136,3 +136,7 @@ def test_write_html_report_contains_map_markers_and_filter_metadata(tmp_path) ->
     assert "Pair #1" in html
     assert "Best overlap" in html
     assert "Starts apart" in html
+    assert "date-filter" in html
+    assert "All dates" in html
+    assert "sort-filter" in html
+    assert "Sort by" in html

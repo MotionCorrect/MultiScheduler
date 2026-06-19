@@ -46,8 +46,9 @@ def write_markdown_report(
     for match in matches:
         distance = f"; distance: {match.distance_km:.1f} km" if match.distance_km is not None else ""
         overlap = f"; overlap: {_format_gap(match.overlap)}" if match.overlap > timedelta(0) else ""
+        spots = f"; badminton spots: {_format_spots(match.badminton_spots_available)}"
         lines.extend([
-            f"- {_display_priority_label(match.priority_label)} — gap: {_format_gap(match.gap)}; starts apart: {_format_gap(match.start_gap)}{overlap}{distance}",
+            f"- {_display_priority_label(match.priority_label)} — gap: {_format_gap(match.gap)}; starts apart: {_format_gap(match.start_gap)}{overlap}{distance}{spots}",
             f"  - Lane swim: {format_event(match.first)}",
             f"  - Badminton: {format_event(match.second)}",
         ])
@@ -84,6 +85,7 @@ def write_html_report(
         "badmintonEvents": [_event_payload(event) for event in badminton_events],
         "matches": [_match_payload(match) for match in matches],
     }
+    date_options = _date_filter_options(matches)
     match_cards = "\n".join(_match_card(match, index) for index, match in enumerate(matches)) or "<p class='empty'>No matches with the current filters.</p>"
     html = f"""<!doctype html>
 <html lang="en">
@@ -112,7 +114,9 @@ def write_html_report(
     .pair-id {{ display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 999px; margin-right: 8px; background: #8fe7c1; color: #07111e; font-weight: 800; }}
     .controls {{ margin-top: 12px; display:flex; gap: 8px; flex-wrap: wrap; }}
     .control-button {{ border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08); color: #e8eef8; padding: 8px 10px; border-radius: 10px; cursor: pointer; }}
+    select.control-button option {{ color: #172033; background: white; }}
     .control-button:hover {{ background: rgba(255,255,255,.14); }}
+    .chooser-label {{ color:#93a4bc; font-size: 12px; align-self:center; }}
     .focus-note {{ color:#93a4bc; font-size: 13px; margin-top: 8px; }}
     .gap {{ color: #8fe7c1; font-weight: 700; }}
     .distance {{ color: #ffd480; }}
@@ -140,10 +144,21 @@ def write_html_report(
         <div class="metric"><strong>{len(badminton_events)}</strong><span>badminton</span></div>
         <div class="metric"><strong>{_format_optional_distance(config.max_distance_km)}</strong><span>radius</span></div>
       </div>
-      <div class="controls"><button class="control-button" id="show-all">Show all pairings</button></div>
-      <div class="focus-note">Click a card to isolate that pair: only its two markers and connector stay bright, and the map fits both locations.</div>
+      <div class="controls">
+        <label class="chooser-label" for="date-filter">Calendar</label>
+        <select class="control-button" id="date-filter">{date_options}</select>
+        <label class="chooser-label" for="sort-filter">Sort by</label>
+        <select class="control-button" id="sort-filter">
+          <option value="priority">Best drop-off fit</option>
+          <option value="spots">Fewest badminton spots</option>
+          <option value="start-gap">Closest start times</option>
+          <option value="distance">Closest centres</option>
+        </select>
+        <button class="control-button" id="show-all">Show all pairings</button>
+      </div>
+      <div class="focus-note">Use the calendar chooser and sort menu to explore. Click a card to isolate that pair: only its two markers and connector stay bright, and the map fits both locations.</div>
     </section>
-    <section>{match_cards}</section>
+    <section id="match-list">{match_cards}</section>
   </aside>
   <main style="position:relative"><div id="map"></div><div class="legend"><span class="dot swim"></span>Lane swim<br><span class="dot badminton"></span>Badminton</div></main>
 </div>
@@ -173,8 +188,29 @@ function clearFocus() {{
 }}
 function showAllPairings() {{
   clearFocus();
+  document.querySelector('#date-filter').value = 'all';
+  document.querySelector('#sort-filter').value = 'priority';
+  applyExplorationFilters(false);
   allLayers.forEach(layer => {{ if (!map.hasLayer(layer)) layer.addTo(map); }});
   if (allLayers.length) map.fitBounds(L.featureGroup(allLayers).getBounds().pad(.18));
+}}
+function visibleCards() {{ return [...document.querySelectorAll('[data-match]')].filter(card => card.style.display !== 'none'); }}
+function applyExplorationFilters(selectFirst = true) {{
+  const date = document.querySelector('#date-filter')?.value || 'all';
+  const sort = document.querySelector('#sort-filter')?.value || 'priority';
+  const cards = [...document.querySelectorAll('[data-match]')];
+  cards.forEach(card => {{ card.style.display = (date === 'all' || card.dataset.date === date) ? '' : 'none'; }});
+  const ordered = visibleCards().sort((a, b) => {{
+    const ma = matches.matches[Number(a.dataset.match)];
+    const mb = matches.matches[Number(b.dataset.match)];
+    if (sort === 'spots') return (ma.badmintonSpotsAvailable ?? 9999) - (mb.badmintonSpotsAvailable ?? 9999);
+    if (sort === 'start-gap') return ma.startGapMinutes - mb.startGapMinutes;
+    if (sort === 'distance') return (ma.distanceKm ?? 9999) - (mb.distanceKm ?? 9999);
+    return Number(a.dataset.match) - Number(b.dataset.match);
+  }});
+  const container = document.querySelector('#match-list');
+  ordered.forEach(card => container.appendChild(card));
+  if (selectFirst && ordered.length) selectMatch(Number(ordered[0].dataset.match));
 }}
 function selectMatch(index) {{
   const match = matches.matches[index];
@@ -211,7 +247,9 @@ matches.matches.forEach((match, idx) => {{
 if (allLayers.length) {{ map.fitBounds(L.featureGroup(allLayers).getBounds().pad(.18)); }}
 document.querySelectorAll('[data-match]').forEach(card => card.addEventListener('click', () => selectMatch(Number(card.dataset.match))));
 document.querySelector('#show-all')?.addEventListener('click', showAllPairings);
-if (matches.matches.length) selectMatch(0);
+document.querySelector('#date-filter')?.addEventListener('change', () => applyExplorationFilters(true));
+document.querySelector('#sort-filter')?.addEventListener('change', () => applyExplorationFilters(true));
+if (matches.matches.length) applyExplorationFilters(true);
 </script>
 </body>
 </html>
@@ -223,9 +261,9 @@ def _match_card(match: NearbyMatch, index: int) -> str:
     distance = f"<span class='distance'>{match.distance_km:.1f} km</span>" if match.distance_km is not None else "<span class='distance'>distance n/a</span>"
     overlap = f" · Overlap {_format_gap(match.overlap)}" if match.overlap > timedelta(0) else ""
     return f"""
-    <article class="card" data-match="{index}" aria-label="Pair #{index + 1}">
+    <article class="card" data-match="{index}" data-date="{match.first.start:%Y-%m-%d}" aria-label="Pair #{index + 1}">
       <div><span class="pair-id">{index + 1}</span><span class="gap">{escape(_display_priority_label(match.priority_label))}</span> · {distance}</div>
-      <div class="focus-note">Gap {_format_gap(match.gap)} · Starts apart {_format_gap(match.start_gap)}{overlap}</div>
+      <div class="focus-note">Gap {_format_gap(match.gap)} · Starts apart {_format_gap(match.start_gap)}{overlap} · Badminton spots {_format_spots(match.badminton_spots_available)}</div>
       <div class="event"><b>Swim</b><br>{escape(format_event(match.first))}</div>
       <div class="event"><b>Badminton</b><br>{escape(format_event(match.second))}</div>
     </article>
@@ -252,10 +290,27 @@ def _match_payload(match: NearbyMatch) -> dict:
         "overlap": _format_gap(match.overlap),
         "startGap": _format_gap(match.start_gap),
         "priorityLabel": _display_priority_label(match.priority_label),
+        "date": match.first.start.strftime("%Y-%m-%d"),
+        "startGapMinutes": int(match.start_gap.total_seconds() // 60),
+        "badmintonSpotsAvailable": match.badminton_spots_available,
         "distanceKm": match.distance_km,
         "first": _event_payload(match.first),
         "second": _event_payload(match.second),
     }
+
+
+def _date_filter_options(matches: list[NearbyMatch]) -> str:
+    dates = sorted({match.first.start.date() for match in matches})
+    options = ['<option value="all">All dates</option>']
+    options.extend(
+        f'<option value="{date:%Y-%m-%d}">{date:%a %b %d}</option>'
+        for date in dates
+    )
+    return "\n".join(options)
+
+
+def _format_spots(spots: int | None) -> str:
+    return "n/a" if spots is None else str(spots)
 
 
 def _display_priority_label(label: str) -> str:
