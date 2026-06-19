@@ -28,3 +28,6 @@ class NearbyMatch:
     second: ActivityEvent
     gap: timedelta
     distance_km: float | None = None
+    overlap: timedelta = timedelta(0)
+    start_gap: timedelta = timedelta(0)
+    priority_label: str = "nearby gap"

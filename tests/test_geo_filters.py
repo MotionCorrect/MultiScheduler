@@ -101,3 +101,5 @@ def test_write_html_report_contains_map_markers_and_filter_metadata(tmp_path) ->
     assert "selectMatch" in html
     assert "Show all pairings" in html
     assert "Pair #1" in html
+    assert "Best overlap" in html
+    assert "Starts apart" in html

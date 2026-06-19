@@ -82,6 +82,38 @@ def test_find_nearby_pairs_detects_overlaps_as_zero_gap() -> None:
     assert matches[0].gap == timedelta(0)
 
 
+def test_find_nearby_pairs_prioritizes_dropoff_friendly_overlaps() -> None:
+    swim_early_gap = ActivityEvent(
+        source="lane_swim",
+        name="Lane Swim gap",
+        start=datetime(2026, 6, 20, 8, 0),
+        end=datetime(2026, 6, 20, 9, 0),
+        location="Pool",
+    )
+    swim_best_overlap = ActivityEvent(
+        source="lane_swim",
+        name="Lane Swim best overlap",
+        start=datetime(2026, 6, 20, 10, 20),
+        end=datetime(2026, 6, 20, 11, 20),
+        location="Pool",
+    )
+    badminton = ActivityEvent(
+        source="badminton",
+        name="Drop-off badminton",
+        start=datetime(2026, 6, 20, 10, 0),
+        end=datetime(2026, 6, 20, 11, 30),
+        location="Gym",
+    )
+
+    matches = find_nearby_pairs([swim_early_gap, swim_best_overlap], [badminton], max_gap=timedelta(hours=2))
+
+    assert matches[0].first == swim_best_overlap
+    assert matches[0].overlap == timedelta(hours=1)
+    assert matches[0].start_gap == timedelta(minutes=20)
+    assert matches[0].priority_label == "best overlap"
+    assert matches[1].gap == timedelta(hours=1)
+
+
 def test_upcoming_window_defaults_to_next_seven_days() -> None:
     start, end = upcoming_window(now=datetime(2026, 6, 19, 2, 0), days=7)
 

@@ -35,6 +35,12 @@ Output:
 - `output/kingston_matches.html` interactive Leaflet/OpenStreetMap view
 - `output/scheduled_scan.log` when run through the scheduled script
 
+Pairing priority:
+
+- Results are ranked for drop-off/use-the-other-activity scenarios.
+- Actual time overlaps appear first, then longer overlaps, then smaller start-time gaps, then smaller event gaps/distance.
+- Each report shows the priority label, event gap, start-time gap, overlap duration, and distance where coordinates are available.
+
 Credentials:
 
 The current schedule endpoints are readable through PerfectMind's public booking API, so credentials are not copied into this repo. If PerfectMind later requires login, keep credentials outside Git and point automation at the existing external file only.

@@ -20,6 +20,18 @@ def event_gap(first: ActivityEvent, second: ActivityEvent) -> timedelta:
     return first.start - second.end
 
 
+def event_overlap(first: ActivityEvent, second: ActivityEvent) -> timedelta:
+    overlap_start = max(first.start, second.start)
+    overlap_end = min(first.end, second.end)
+    if overlap_end <= overlap_start:
+        return timedelta(0)
+    return overlap_end - overlap_start
+
+
+def event_start_gap(first: ActivityEvent, second: ActivityEvent) -> timedelta:
+    return abs(first.start - second.start)
+
+
 def find_nearby_pairs(
     first_events: list[ActivityEvent],
     second_events: list[ActivityEvent],
@@ -42,14 +54,48 @@ def find_nearby_pairs(
             distance = event_distance_km(first, second)
             if max_distance_km is not None and (distance is None or distance > max_distance_km):
                 continue
-            matches.append(NearbyMatch(first=first, second=second, gap=gap, distance_km=distance))
-    return sorted(matches, key=lambda item: (item.first.start, item.gap, item.distance_km or 0, item.second.start))
+            overlap = event_overlap(first, second)
+            start_gap = event_start_gap(first, second)
+            matches.append(
+                NearbyMatch(
+                    first=first,
+                    second=second,
+                    gap=gap,
+                    distance_km=distance,
+                    overlap=overlap,
+                    start_gap=start_gap,
+                    priority_label=_priority_label(overlap, gap),
+                )
+            )
+    return sorted(matches, key=_priority_key)
 
 
 def event_distance_km(first: ActivityEvent, second: ActivityEvent) -> float | None:
     if first.latitude is None or first.longitude is None or second.latitude is None or second.longitude is None:
         return None
     return round(haversine_km(first.latitude, first.longitude, second.latitude, second.longitude), 3)
+
+
+def _priority_key(match: NearbyMatch) -> tuple:
+    has_overlap = match.overlap > timedelta(0)
+    distance = match.distance_km if match.distance_km is not None else 9999.0
+    return (
+        0 if has_overlap else 1,
+        -int(match.overlap.total_seconds()),
+        int(match.start_gap.total_seconds()),
+        int(match.gap.total_seconds()),
+        distance,
+        match.first.start,
+        match.second.start,
+    )
+
+
+def _priority_label(overlap: timedelta, gap: timedelta) -> str:
+    if overlap > timedelta(0):
+        return "best overlap"
+    if gap == timedelta(0):
+        return "touching"
+    return "nearby gap"
 
 
 def _location_allowed(event: ActivityEvent, include_locations: set[str] | None) -> bool:

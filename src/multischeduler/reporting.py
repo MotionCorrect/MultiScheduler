@@ -44,8 +44,9 @@ def write_markdown_report(
         lines.append("- No lane swim / badminton pair found in this window with the current filters.")
     for match in matches:
         distance = f"; distance: {match.distance_km:.1f} km" if match.distance_km is not None else ""
+        overlap = f"; overlap: {_format_gap(match.overlap)}" if match.overlap > timedelta(0) else ""
         lines.extend([
-            f"- Gap: {_format_gap(match.gap)}{distance}",
+            f"- {_display_priority_label(match.priority_label)} — gap: {_format_gap(match.gap)}; starts apart: {_format_gap(match.start_gap)}{overlap}{distance}",
             f"  - Lane swim: {format_event(match.first)}",
             f"  - Badminton: {format_event(match.second)}",
         ])
@@ -219,9 +220,11 @@ if (matches.matches.length) selectMatch(0);
 
 def _match_card(match: NearbyMatch, index: int) -> str:
     distance = f"<span class='distance'>{match.distance_km:.1f} km</span>" if match.distance_km is not None else "<span class='distance'>distance n/a</span>"
+    overlap = f" · Overlap {_format_gap(match.overlap)}" if match.overlap > timedelta(0) else ""
     return f"""
     <article class="card" data-match="{index}" aria-label="Pair #{index + 1}">
-      <div><span class="pair-id">{index + 1}</span><span class="gap">{escape(_format_gap(match.gap))}</span> · {distance}</div>
+      <div><span class="pair-id">{index + 1}</span><span class="gap">{escape(_display_priority_label(match.priority_label))}</span> · {distance}</div>
+      <div class="focus-note">Gap {_format_gap(match.gap)} · Starts apart {_format_gap(match.start_gap)}{overlap}</div>
       <div class="event"><b>Swim</b><br>{escape(format_event(match.first))}</div>
       <div class="event"><b>Badminton</b><br>{escape(format_event(match.second))}</div>
     </article>
@@ -245,10 +248,18 @@ def _event_payload(event: ActivityEvent) -> dict:
 def _match_payload(match: NearbyMatch) -> dict:
     return {
         "gap": _format_gap(match.gap),
+        "overlap": _format_gap(match.overlap),
+        "startGap": _format_gap(match.start_gap),
+        "priorityLabel": _display_priority_label(match.priority_label),
         "distanceKm": match.distance_km,
         "first": _event_payload(match.first),
         "second": _event_payload(match.second),
     }
+
+
+def _display_priority_label(label: str) -> str:
+    words = label.replace("_", " ")
+    return words[:1].upper() + words[1:]
 
 
 def _format_gap(gap: timedelta) -> str:
