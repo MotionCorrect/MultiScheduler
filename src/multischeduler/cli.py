@@ -5,39 +5,71 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import os
 
+from .config import SearchConfig, load_config
 from .matching import find_nearby_pairs, upcoming_window
 from .perfectmind import BADMINTON, LANE_SWIM, PerfectMindClient
-from .reporting import write_markdown_report
+from .reporting import write_html_report, write_markdown_report
 
 DEFAULT_OUTPUT = Path(os.environ.get("MULTISCHEDULER_OUTPUT_DIR", r"H:\git\MultiScheduler\output"))
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Cross-reference Kingston lane swim and badminton schedules.")
-    parser.add_argument("--days", type=int, default=7, help="Upcoming-day window to inspect. Default: 7.")
-    parser.add_argument("--max-gap-hours", type=float, default=2.0, help="Maximum allowed gap between activities. Default: 2.")
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--config", type=Path, help="Optional JSON search configuration file.")
+    parser.add_argument("--days", type=int, help="Upcoming-day window to inspect. Overrides config. Default: 7.")
+    parser.add_argument("--max-gap-hours", type=float, help="Maximum allowed gap between activities. Overrides config. Default: 2.")
+    parser.add_argument("--max-distance-km", type=float, help="Maximum geographic distance between paired centres.")
+    parser.add_argument(
+        "--include-location",
+        action="append",
+        default=[],
+        help="Only keep events at this centre/facility. Can be repeated.",
+    )
+    parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--start-date", help="Override start date as YYYY-MM-DD for testing.")
     args = parser.parse_args(argv)
 
+    config = _merge_args(load_config(args.config), args)
     if args.start_date:
         start = datetime.strptime(args.start_date, "%Y-%m-%d")
-        end = start + timedelta(days=args.days)
+        end = start + timedelta(days=config.days)
     else:
-        start, end = upcoming_window(days=args.days)
+        start, end = upcoming_window(days=config.days)
 
     client = PerfectMindClient()
     lane_events = client.fetch_events(LANE_SWIM, start, end)
     badminton_events = client.fetch_events(BADMINTON, start, end)
-    matches = find_nearby_pairs(lane_events, badminton_events, max_gap=timedelta(hours=args.max_gap_hours))
+    matches = find_nearby_pairs(
+        lane_events,
+        badminton_events,
+        max_gap=timedelta(hours=config.max_gap_hours),
+        max_distance_km=config.max_distance_km,
+        include_locations=config.include_locations,
+    )
 
-    output_dir = args.output_dir
-    write_markdown_report(output_dir / "kingston_matches.md", start, end, lane_events, badminton_events, matches)
+    output_dir = Path(config.output_dir) if config.output_dir else DEFAULT_OUTPUT
+    write_markdown_report(output_dir / "kingston_matches.md", start, end, lane_events, badminton_events, matches, config)
+    write_html_report(output_dir / "kingston_matches.html", start, end, lane_events, badminton_events, matches, config)
     print(f"Lane swim events: {len(lane_events)}")
     print(f"Badminton events: {len(badminton_events)}")
-    print(f"Matches within {args.max_gap_hours:g}h: {len(matches)}")
-    print(f"Report: {output_dir / 'kingston_matches.md'}")
+    print(f"Matches within {config.max_gap_hours:g}h: {len(matches)}")
+    print(f"Max distance: {'any' if config.max_distance_km is None else f'{config.max_distance_km:g} km'}")
+    print(f"Included locations: {'any' if not config.include_locations else ', '.join(sorted(config.include_locations))}")
+    print(f"Markdown report: {output_dir / 'kingston_matches.md'}")
+    print(f"HTML map report: {output_dir / 'kingston_matches.html'}")
     return 0
+
+
+def _merge_args(config: SearchConfig, args: argparse.Namespace) -> SearchConfig:
+    include_locations = set(config.include_locations)
+    include_locations.update(args.include_location or [])
+    return SearchConfig(
+        days=args.days if args.days is not None else config.days,
+        max_gap_hours=args.max_gap_hours if args.max_gap_hours is not None else config.max_gap_hours,
+        max_distance_km=args.max_distance_km if args.max_distance_km is not None else config.max_distance_km,
+        include_locations=include_locations,
+        output_dir=str(args.output_dir) if args.output_dir is not None else config.output_dir,
+    )
 
 
 if __name__ == "__main__":

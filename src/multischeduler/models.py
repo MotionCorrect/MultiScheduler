@@ -16,6 +16,9 @@ class ActivityEvent:
     book_button_text: str | None = None
     course_id: str | None = None
     event_id: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    address: str | None = None
     raw: dict | None = None
 
 
@@ -24,3 +27,4 @@ class NearbyMatch:
     first: ActivityEvent
     second: ActivityEvent
     gap: timedelta
+    distance_km: float | None = None

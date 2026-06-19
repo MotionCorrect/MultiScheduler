@@ -14,9 +14,25 @@ Run manually:
 uv run multischeduler --days 7 --max-gap-hours 2
 ```
 
+Filter by geography or selected centres:
+
+```bash
+# Only pair events within 2 km of each other
+uv run multischeduler --days 7 --max-gap-hours 2 --max-distance-km 2
+
+# Only keep events at specific locations/facilities; repeat the flag as needed
+uv run multischeduler --include-location "Artillery Park Aquatic Centre" --include-location "Matthew Cahill Gymnasium"
+
+# Or use JSON config (the scheduled task reads multischeduler.config.json)
+uv run multischeduler --config multischeduler.example.json
+```
+
+Edit `multischeduler.config.json` to change the recurring scan without touching the scheduled task.
+
 Output:
 
 - `output/kingston_matches.md`
+- `output/kingston_matches.html` interactive Leaflet/OpenStreetMap view
 - `output/scheduled_scan.log` when run through the scheduled script
 
 Credentials:
