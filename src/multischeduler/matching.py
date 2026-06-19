@@ -37,6 +37,7 @@ def find_nearby_pairs(
     second_events: list[ActivityEvent],
     max_gap: timedelta,
     max_distance_km: float | None = None,
+    max_start_gap: timedelta | None = None,
     include_locations: set[str] | None = None,
 ) -> list[NearbyMatch]:
     matches: list[NearbyMatch] = []
@@ -56,6 +57,8 @@ def find_nearby_pairs(
                 continue
             overlap = event_overlap(first, second)
             start_gap = event_start_gap(first, second)
+            if max_start_gap is not None and start_gap >= max_start_gap:
+                continue
             matches.append(
                 NearbyMatch(
                     first=first,

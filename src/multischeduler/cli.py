@@ -19,6 +19,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--days", type=int, help="Upcoming-day window to inspect. Overrides config. Default: 7.")
     parser.add_argument("--max-gap-hours", type=float, help="Maximum allowed gap between activities. Overrides config. Default: 2.")
     parser.add_argument("--max-distance-km", type=float, help="Maximum geographic distance between paired centres.")
+    parser.add_argument("--max-start-gap-hours", type=float, help="Require activity start times to be less than this many hours apart.")
     parser.add_argument(
         "--include-location",
         action="append",
@@ -44,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
         badminton_events,
         max_gap=timedelta(hours=config.max_gap_hours),
         max_distance_km=config.max_distance_km,
+        max_start_gap=(None if config.max_start_gap_hours is None else timedelta(hours=config.max_start_gap_hours)),
         include_locations=config.include_locations,
     )
 
@@ -54,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Badminton events: {len(badminton_events)}")
     print(f"Matches within {config.max_gap_hours:g}h: {len(matches)}")
     print(f"Max distance: {'any' if config.max_distance_km is None else f'{config.max_distance_km:g} km'}")
+    print(f"Max starts apart: {'any' if config.max_start_gap_hours is None else f'< {config.max_start_gap_hours:g}h'}")
     print(f"Included locations: {'any' if not config.include_locations else ', '.join(sorted(config.include_locations))}")
     print(f"Markdown report: {output_dir / 'kingston_matches.md'}")
     print(f"HTML map report: {output_dir / 'kingston_matches.html'}")
@@ -67,6 +70,9 @@ def _merge_args(config: SearchConfig, args: argparse.Namespace) -> SearchConfig:
         days=args.days if args.days is not None else config.days,
         max_gap_hours=args.max_gap_hours if args.max_gap_hours is not None else config.max_gap_hours,
         max_distance_km=args.max_distance_km if args.max_distance_km is not None else config.max_distance_km,
+        max_start_gap_hours=(
+            args.max_start_gap_hours if args.max_start_gap_hours is not None else config.max_start_gap_hours
+        ),
         include_locations=include_locations,
         output_dir=str(args.output_dir) if args.output_dir is not None else config.output_dir,
     )

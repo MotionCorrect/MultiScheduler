@@ -11,7 +11,7 @@ Current job:
 Run manually:
 
 ```bash
-uv run multischeduler --days 7 --max-gap-hours 2
+uv run multischeduler --days 7 --max-gap-hours 2 --max-start-gap-hours 1.5
 ```
 
 Filter by geography or selected centres:
@@ -19,6 +19,9 @@ Filter by geography or selected centres:
 ```bash
 # Only pair events within 2 km of each other
 uv run multischeduler --days 7 --max-gap-hours 2 --max-distance-km 2
+
+# Only keep pairings whose start times are less than 1.5 hours apart
+uv run multischeduler --max-start-gap-hours 1.5
 
 # Only keep events at specific locations/facilities; repeat the flag as needed
 uv run multischeduler --include-location "Artillery Park Aquatic Centre" --include-location "Matthew Cahill Gymnasium"
@@ -37,7 +40,7 @@ Output:
 
 Pairing priority:
 
-- Results are ranked for drop-off/use-the-other-activity scenarios.
+- Results are filtered by default to starts less than 1.5 hours apart for drop-off/use-the-other-activity scenarios.
 - Actual time overlaps appear first, then longer overlaps, then smaller start-time gaps, then smaller event gaps/distance.
 - Each report shows the priority label, event gap, start-time gap, overlap duration, and distance where coordinates are available.
 

@@ -35,6 +35,7 @@ def write_markdown_report(
         f"Generated: {datetime.now():%Y-%m-%d %H:%M:%S}",
         f"Max gap: {config.max_gap_hours:g} hours",
         f"Max distance: {_format_optional_distance(config.max_distance_km)}",
+        f"Max starts apart: {_format_optional_hours(config.max_start_gap_hours)}",
         f"Included locations: {_format_locations(config.include_locations)}",
         "",
         f"## Lane Swim + Badminton Within {config.max_gap_hours:g} Hours",
@@ -127,7 +128,7 @@ def write_html_report(
 <body>
 <header>
   <h1>Lane Swim + Badminton Pairings</h1>
-  <div class="subtitle">{start:%Y-%m-%d} to {end:%Y-%m-%d} · Max gap: {config.max_gap_hours:g}h · Max distance: {_format_optional_distance(config.max_distance_km)} · Included centres: {_format_locations(config.include_locations)}</div>
+  <div class="subtitle">{start:%Y-%m-%d} to {end:%Y-%m-%d} · Max gap: {config.max_gap_hours:g}h · Max distance: {_format_optional_distance(config.max_distance_km)} · Max starts apart: {_format_optional_hours(config.max_start_gap_hours)} · Included centres: {_format_locations(config.include_locations)}</div>
 </header>
 <div class="shell">
   <aside>
@@ -277,6 +278,10 @@ def _format_gap(gap: timedelta) -> str:
 
 def _format_optional_distance(distance: float | None) -> str:
     return "any" if distance is None else f"{distance:.1f} km"
+
+
+def _format_optional_hours(hours: float | None) -> str:
+    return "any" if hours is None else f"{hours:g}h"
 
 
 def _format_locations(locations: set[str]) -> str:

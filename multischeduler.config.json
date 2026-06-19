@@ -2,6 +2,7 @@
   "days": 7,
   "max_gap_hours": 2.0,
   "max_distance_km": null,
+  "max_start_gap_hours": 1.5,
   "include_locations": [],
   "output_dir": "H:\\git\\MultiScheduler\\output"
 }
