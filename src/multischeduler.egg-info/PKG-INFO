@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: multischeduler
+Version: 0.1.0
+Summary: Cross-reference Kingston recreation schedules for nearby multi-activity windows.
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
