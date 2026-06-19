@@ -104,8 +104,14 @@ def write_html_report(
     .metric {{ background: rgba(255,255,255,.08); border-radius: 12px; padding: 10px; }}
     .metric strong {{ display: block; font-size: 22px; }}
     .label {{ color: #93a4bc; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }}
-    .card {{ cursor: pointer; transition: transform .16s, background .16s; }}
+    .card {{ cursor: pointer; transition: transform .16s, background .16s, border-color .16s; }}
     .card:hover {{ transform: translateY(-1px); background: rgba(87, 163, 255, .13); }}
+    .card.active {{ background: rgba(143, 231, 193, .14); border-color: #8fe7c1; box-shadow: 0 0 0 1px rgba(143,231,193,.35); }}
+    .pair-id {{ display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 999px; margin-right: 8px; background: #8fe7c1; color: #07111e; font-weight: 800; }}
+    .controls {{ margin-top: 12px; display:flex; gap: 8px; flex-wrap: wrap; }}
+    .control-button {{ border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08); color: #e8eef8; padding: 8px 10px; border-radius: 10px; cursor: pointer; }}
+    .control-button:hover {{ background: rgba(255,255,255,.14); }}
+    .focus-note {{ color:#93a4bc; font-size: 13px; margin-top: 8px; }}
     .gap {{ color: #8fe7c1; font-weight: 700; }}
     .distance {{ color: #ffd480; }}
     .event {{ margin-top: 10px; line-height: 1.35; }}
@@ -132,6 +138,8 @@ def write_html_report(
         <div class="metric"><strong>{len(badminton_events)}</strong><span>badminton</span></div>
         <div class="metric"><strong>{_format_optional_distance(config.max_distance_km)}</strong><span>radius</span></div>
       </div>
+      <div class="controls"><button class="control-button" id="show-all">Show all pairings</button></div>
+      <div class="focus-note">Click a card to isolate that pair: only its two markers and connector stay bright, and the map fits both locations.</div>
     </section>
     <section>{match_cards}</section>
   </aside>
@@ -142,26 +150,66 @@ def write_html_report(
 const matches = {json.dumps(payload, default=str)};
 const map = L.map('map').setView([44.235, -76.48], 12);
 L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{ maxZoom: 19, attribution: '&copy; OpenStreetMap' }}).addTo(map);
-const layers = [];
-function marker(event, color) {{
+const allLayers = [];
+let focusLayers = [];
+function pointIcon(color, label = '', size = 18, opacity = 1) {{
+  const labelHtml = label ? `<span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:800 11px/1 sans-serif;color:#07111e">${{label}}</span>` : '';
+  return L.divIcon({{className:'', html:`<div style="position:relative;width:${{size}}px;height:${{size}}px;border-radius:50%;background:${{color}};opacity:${{opacity}};border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.35)">${{labelHtml}}</div>`}});
+}}
+function marker(event, color, opacity = .42) {{
   if (event.latitude == null || event.longitude == null) return null;
-  const icon = L.divIcon({{className:'', html:`<div style="width:16px;height:16px;border-radius:50%;background:${{color}};border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.35)"></div>`}});
-  const m = L.marker([event.latitude, event.longitude], {{icon}}).bindPopup(`<b>${{event.name}}</b><br>${{event.start}} - ${{event.end}}<br>${{event.location || ''}}<br>${{event.spots || ''}}`);
-  m.addTo(map); layers.push(m); return m;
+  const m = L.marker([event.latitude, event.longitude], {{icon: pointIcon(color, '', 14, opacity)}}).bindPopup(`<b>${{event.name}}</b><br>${{event.start}} - ${{event.end}}<br>${{event.location || ''}}<br>${{event.spots || ''}}`);
+  m.addTo(map); allLayers.push(m); return m;
+}}
+function eventPopup(event, title) {{
+  return `<b>${{title}}</b><br>${{event.name}}<br>${{event.start}} - ${{event.end}}<br>${{event.location || ''}}<br>${{event.facility || ''}}<br>${{event.spots || ''}}`;
+}}
+function clearFocus() {{
+  focusLayers.forEach(layer => map.removeLayer(layer));
+  focusLayers = [];
+  document.querySelectorAll('[data-match]').forEach(card => card.classList.remove('active'));
+}}
+function showAllPairings() {{
+  clearFocus();
+  allLayers.forEach(layer => {{ if (!map.hasLayer(layer)) layer.addTo(map); }});
+  if (allLayers.length) map.fitBounds(L.featureGroup(allLayers).getBounds().pad(.18));
+}}
+function selectMatch(index) {{
+  const match = matches.matches[index];
+  if (!match) return;
+  clearFocus();
+  allLayers.forEach(layer => layer.setOpacity?.(.18));
+  const bounds = [];
+  const pairNo = String(index + 1);
+  if (match.first.latitude != null) {{
+    const swim = L.marker([match.first.latitude, match.first.longitude], {{icon: pointIcon('#2f80ed', pairNo, 30, 1), zIndexOffset: 1000}}).bindPopup(eventPopup(match.first, `Pair #${{pairNo}} swim`)).addTo(map);
+    focusLayers.push(swim); bounds.push([match.first.latitude, match.first.longitude]);
+  }}
+  if (match.second.latitude != null) {{
+    const badminton = L.marker([match.second.latitude, match.second.longitude], {{icon: pointIcon('#f2994a', pairNo, 30, 1), zIndexOffset: 1000}}).bindPopup(eventPopup(match.second, `Pair #${{pairNo}} badminton`)).addTo(map);
+    focusLayers.push(badminton); bounds.push([match.second.latitude, match.second.longitude]);
+  }}
+  if (bounds.length === 2) {{
+    const line = L.polyline(bounds, {{color:'#8fe7c1', weight:7, opacity:.95, dashArray:'10 8'}}).addTo(map);
+    focusLayers.push(line);
+    map.fitBounds(L.latLngBounds(bounds).pad(.55));
+  }} else if (bounds.length === 1) {{
+    map.flyTo(bounds[0], 14);
+  }}
+  document.querySelector(`[data-match="${{index}}"]`)?.classList.add('active');
 }}
 matches.laneEvents.forEach(e => marker(e, '#2f80ed'));
 matches.badmintonEvents.forEach(e => marker(e, '#f2994a'));
 matches.matches.forEach((match, idx) => {{
   if (match.first.latitude != null && match.second.latitude != null) {{
-    const line = L.polyline([[match.first.latitude, match.first.longitude], [match.second.latitude, match.second.longitude]], {{color:'#8fe7c1', weight:3, opacity:.55}}).addTo(map);
-    layers.push(line);
+    const line = L.polyline([[match.first.latitude, match.first.longitude], [match.second.latitude, match.second.longitude]], {{color:'#8fe7c1', weight:2, opacity:.18}}).addTo(map);
+    allLayers.push(line);
   }}
 }});
-if (layers.length) {{ map.fitBounds(L.featureGroup(layers).getBounds().pad(.18)); }}
-document.querySelectorAll('[data-match]').forEach(card => card.addEventListener('click', () => {{
-  const match = matches.matches[Number(card.dataset.match)];
-  if (match?.first?.latitude != null) map.flyTo([match.first.latitude, match.first.longitude], 14);
-}}));
+if (allLayers.length) {{ map.fitBounds(L.featureGroup(allLayers).getBounds().pad(.18)); }}
+document.querySelectorAll('[data-match]').forEach(card => card.addEventListener('click', () => selectMatch(Number(card.dataset.match))));
+document.querySelector('#show-all')?.addEventListener('click', showAllPairings);
+if (matches.matches.length) selectMatch(0);
 </script>
 </body>
 </html>
@@ -172,8 +220,8 @@ document.querySelectorAll('[data-match]').forEach(card => card.addEventListener(
 def _match_card(match: NearbyMatch, index: int) -> str:
     distance = f"<span class='distance'>{match.distance_km:.1f} km</span>" if match.distance_km is not None else "<span class='distance'>distance n/a</span>"
     return f"""
-    <article class="card" data-match="{index}">
-      <div><span class="gap">{escape(_format_gap(match.gap))}</span> · {distance}</div>
+    <article class="card" data-match="{index}" aria-label="Pair #{index + 1}">
+      <div><span class="pair-id">{index + 1}</span><span class="gap">{escape(_format_gap(match.gap))}</span> · {distance}</div>
       <div class="event"><b>Swim</b><br>{escape(format_event(match.first))}</div>
       <div class="event"><b>Badminton</b><br>{escape(format_event(match.second))}</div>
     </article>

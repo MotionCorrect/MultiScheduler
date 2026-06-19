@@ -98,3 +98,6 @@ def test_write_html_report_contains_map_markers_and_filter_metadata(tmp_path) ->
     assert "Kingston East Community Centre" in html
     assert "Max distance: 5.0 km" in html
     assert "const matches =" in html
+    assert "selectMatch" in html
+    assert "Show all pairings" in html
+    assert "Pair #1" in html
