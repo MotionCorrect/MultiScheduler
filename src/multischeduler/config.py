@@ -13,6 +13,7 @@ class SearchConfig:
     max_start_gap_hours: float | None = None
     include_locations: set[str] = field(default_factory=set)
     output_dir: str | None = None
+    slack_webhook_url: str | None = None
 
 
 def load_config(path: Path | None) -> SearchConfig:
@@ -28,4 +29,5 @@ def load_config(path: Path | None) -> SearchConfig:
         ),
         include_locations={str(item) for item in data.get("include_locations", [])},
         output_dir=data.get("output_dir"),
+        slack_webhook_url=data.get("slack_webhook_url"),
     )

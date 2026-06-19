@@ -9,6 +9,7 @@ from .config import SearchConfig, load_config
 from .matching import find_nearby_pairs, upcoming_window
 from .perfectmind import BADMINTON, LANE_SWIM, PerfectMindClient
 from .reporting import write_html_report, write_markdown_report
+from .slack import build_slack_payload, post_slack_payload
 
 DEFAULT_OUTPUT = Path(os.environ.get("MULTISCHEDULER_OUTPUT_DIR", r"H:\git\MultiScheduler\output"))
 
@@ -27,6 +28,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Only keep events at this centre/facility. Can be repeated.",
     )
     parser.add_argument("--output-dir", type=Path, default=None)
+    parser.add_argument("--slack-webhook-url", help="Optional Slack incoming-webhook URL. Prefer env/config over shell history.")
     parser.add_argument("--start-date", help="Override start date as YYYY-MM-DD for testing.")
     args = parser.parse_args(argv)
 
@@ -52,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     output_dir = Path(config.output_dir) if config.output_dir else DEFAULT_OUTPUT
     write_markdown_report(output_dir / "kingston_matches.md", start, end, lane_events, badminton_events, matches, config)
     write_html_report(output_dir / "kingston_matches.html", start, end, lane_events, badminton_events, matches, config)
+    slack_status = _send_slack_if_configured(config.slack_webhook_url, start, end, matches, output_dir)
     print(f"Lane swim events: {len(lane_events)}")
     print(f"Badminton events: {len(badminton_events)}")
     print(f"Matches within {config.max_gap_hours:g}h: {len(matches)}")
@@ -60,6 +63,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Included locations: {'any' if not config.include_locations else ', '.join(sorted(config.include_locations))}")
     print(f"Markdown report: {output_dir / 'kingston_matches.md'}")
     print(f"HTML map report: {output_dir / 'kingston_matches.html'}")
+    print(slack_status)
     return 0
 
 
@@ -75,7 +79,28 @@ def _merge_args(config: SearchConfig, args: argparse.Namespace) -> SearchConfig:
         ),
         include_locations=include_locations,
         output_dir=str(args.output_dir) if args.output_dir is not None else config.output_dir,
+        slack_webhook_url=(
+            args.slack_webhook_url
+            or config.slack_webhook_url
+            or os.environ.get("MULTISCHEDULER_SLACK_WEBHOOK_URL")
+        ),
     )
+
+
+def _send_slack_if_configured(
+    webhook_url: str | None,
+    start: datetime,
+    end: datetime,
+    matches,
+    output_dir: Path,
+) -> str:
+    if not webhook_url:
+        return "Slack: not configured"
+    try:
+        post_slack_payload(webhook_url, build_slack_payload(start, end, matches, output_dir))
+    except Exception as exc:  # Keep scheduled scans from failing solely because Slack is down/blocked.
+        return f"Slack: failed ({exc})"
+    return "Slack: sent"
 
 
 if __name__ == "__main__":

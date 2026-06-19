@@ -45,6 +45,13 @@ Pairing priority:
 - Each report shows the priority label, event gap, start-time gap, overlap duration, distance, and badminton spots where available.
 - The HTML report includes client-side exploration controls: calendar/date chooser, sort by best fit, sort by fewest badminton spots, sort by closest start times, and sort by closest centres.
 
+Slack notification:
+
+- Optional Slack integration uses an Incoming Webhook URL and sends a short text summary with the top matches plus local report paths.
+- Do not commit a real webhook URL. Set `MULTISCHEDULER_SLACK_WEBHOOK_URL` in the scheduled-task environment, pass `--slack-webhook-url` for a one-off test, or set `slack_webhook_url` in a local untracked/private config.
+- Slack Enterprise Grid workspaces may require an admin to approve incoming webhooks or the Slack app before messages can post.
+- If Slack is unavailable or blocks the webhook, the scan still completes and logs `Slack: failed (...)` instead of failing the schedule run.
+
 Credentials:
 
 The current schedule endpoints are readable through PerfectMind's public booking API, so credentials are not copied into this repo. If PerfectMind later requires login, keep credentials outside Git and point automation at the existing external file only.
