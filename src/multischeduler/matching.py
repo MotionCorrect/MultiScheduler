@@ -58,7 +58,7 @@ def find_nearby_pairs(
                 continue
             overlap = event_overlap(first, second)
             start_gap = event_start_gap(first, second)
-            if max_start_gap is not None and start_gap >= max_start_gap:
+            if max_start_gap is not None and start_gap > max_start_gap:
                 continue
             matches.append(
                 NearbyMatch(

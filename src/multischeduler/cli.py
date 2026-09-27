@@ -10,6 +10,7 @@ from .matching import find_nearby_pairs, upcoming_window
 from .perfectmind import BADMINTON, LANE_SWIM, PerfectMindClient
 from .reporting import write_html_report, write_markdown_report
 from .slack import build_slack_payload, post_slack_payload
+from .ymca import fetch_kingston_lap_pool_events
 
 DEFAULT_OUTPUT = Path(os.environ.get("MULTISCHEDULER_OUTPUT_DIR", r"H:\git\MultiScheduler\output"))
 
@@ -40,7 +41,9 @@ def main(argv: list[str] | None = None) -> int:
         start, end = upcoming_window(days=config.days)
 
     client = PerfectMindClient()
-    lane_events = client.fetch_events(LANE_SWIM, start, end)
+    city_lane_events = client.fetch_events(LANE_SWIM, start, end)
+    ymca_lane_events = fetch_kingston_lap_pool_events(start, end)
+    lane_events = sorted(city_lane_events + ymca_lane_events, key=lambda event: (event.start, event.location or "", event.name))
     badminton_events = client.fetch_events(BADMINTON, start, end)
     matches = find_nearby_pairs(
         lane_events,
@@ -55,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
     write_markdown_report(output_dir / "kingston_matches.md", start, end, lane_events, badminton_events, matches, config)
     write_html_report(output_dir / "kingston_matches.html", start, end, lane_events, badminton_events, matches, config)
     slack_status = _send_slack_if_configured(config.slack_webhook_url, start, end, matches, output_dir)
-    print(f"Lane swim events: {len(lane_events)}")
+    print(f"Lane swim events: {len(lane_events)} ({len(city_lane_events)} City, {len(ymca_lane_events)} YMCA lap pool >2 lanes)")
     print(f"Badminton events: {len(badminton_events)}")
     print(f"Matches within {config.max_gap_hours:g}h: {len(matches)}")
     print(f"Max distance: {'any' if config.max_distance_km is None else f'{config.max_distance_km:g} km'}")
