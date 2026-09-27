@@ -12,7 +12,7 @@ from .reporting import write_html_report, write_markdown_report
 from .slack import build_slack_payload, post_slack_payload
 from .ymca import fetch_kingston_lap_pool_events
 
-DEFAULT_OUTPUT = Path(os.environ.get("MULTISCHEDULER_OUTPUT_DIR", r"H:\git\MultiScheduler\output"))
+DEFAULT_OUTPUT = Path(os.environ.get("MULTISCHEDULER_OUTPUT_DIR", Path(__file__).resolve().parents[2] / "output"))
 
 
 def main(argv: list[str] | None = None) -> int:
