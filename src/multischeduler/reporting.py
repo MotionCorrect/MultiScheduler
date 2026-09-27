@@ -166,9 +166,10 @@ def write_html_report(
 <script>
 const matches = {json.dumps(payload, default=str)};
 const map = L.map('map').setView([44.235, -76.48], 12);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{{z}}/{{y}}/{{x}}', {{
+L.tileLayer('https://{{s}}.tile.openstreetmap.fr/hot/{{z}}/{{x}}/{{y}}.png', {{
   maxZoom: 19,
-  attribution: 'Tiles &copy; Esri'
+  subdomains: 'abc',
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles courtesy of <a href="https://www.hotosm.org/">HOT</a>'
 }}).addTo(map);
 const allLayers = [];
 let focusLayers = [];
