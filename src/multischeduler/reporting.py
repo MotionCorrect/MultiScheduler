@@ -132,6 +132,7 @@ def write_html_report(
 <body>
 <header>
   <h1>Lane Swim + Badminton Pairings</h1>
+  <a href="kingston_calendar.html" style="color:#8fe7c1">Pool-by-pool time-block calendar →</a>
   <div class="subtitle">{start:%Y-%m-%d} to {end:%Y-%m-%d} · Max gap: {config.max_gap_hours:g}h · Max distance: {_format_optional_distance(config.max_distance_km)} · Max starts apart: {_format_optional_hours(config.max_start_gap_hours)} · Included centres: {_format_locations(config.include_locations)}</div>
 </header>
 <div class="shell">

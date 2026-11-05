@@ -6,8 +6,10 @@ from pathlib import Path
 import os
 
 from .config import SearchConfig, load_config
-from .matching import find_nearby_pairs, upcoming_window
-from .perfectmind import BADMINTON, LANE_SWIM, PerfectMindClient
+from .matching import find_nearby_pairs
+from .perfectmind import BADMINTON, SWIMMING, PerfectMindClient
+from .calendar import TIMEZONE, write_calendar
+from dataclasses import replace
 from .reporting import write_html_report, write_markdown_report
 from .slack import build_slack_payload, post_slack_payload
 from .ymca import fetch_kingston_lap_pool_events
@@ -31,6 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--slack-webhook-url", help="Optional Slack incoming-webhook URL. Prefer env/config over shell history.")
     parser.add_argument("--start-date", help="Override start date as YYYY-MM-DD for testing.")
+    parser.add_argument('--calendar-only', action='store_true', help='Refresh City pool calendar only; skip YMCA, pairing reports and Slack.')
     args = parser.parse_args(argv)
 
     config = _merge_args(load_config(args.config), args)
@@ -38,13 +41,22 @@ def main(argv: list[str] | None = None) -> int:
         start = datetime.strptime(args.start_date, "%Y-%m-%d")
         end = start + timedelta(days=config.days)
     else:
-        start, end = upcoming_window(days=config.days)
+        start = datetime.now(TIMEZONE).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+        end = start + timedelta(days=config.days)
 
     client = PerfectMindClient()
-    city_lane_events = client.fetch_events(LANE_SWIM, start, end)
+    swimming_events = client.fetch_events(SWIMMING, start, end)
+    badminton_events = client.fetch_events(BADMINTON, start, end)
+    output_dir = Path(config.output_dir) if config.output_dir else DEFAULT_OUTPUT
+    write_calendar(output_dir, start, end, swimming_events, badminton_events)
+    print(f"Swimming calendar: {output_dir / 'kingston_calendar.html'} ({len(swimming_events)} swim sessions)")
+    print(f"Calendar snapshot: {output_dir / 'kingston_calendar.json'}")
+    if args.calendar_only:
+        print(f"Badminton events: {len(badminton_events)}; YMCA, pair reports and Slack skipped")
+        return 0
+    city_lane_events = [replace(e, source='lane_swim') for e in swimming_events if 'lane swim' in e.name.lower()]
     ymca_lane_events = fetch_kingston_lap_pool_events(start, end)
     lane_events = sorted(city_lane_events + ymca_lane_events, key=lambda event: (event.start, event.location or "", event.name))
-    badminton_events = client.fetch_events(BADMINTON, start, end)
     matches = find_nearby_pairs(
         lane_events,
         badminton_events,

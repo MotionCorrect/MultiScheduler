@@ -1,0 +1,52 @@
+name: Refresh and publish Kingston calendar
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '23 */2 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.9.5'
+          enable-cache: true
+      - run: uv sync --frozen --python 3.11
+      - name: Run tests
+        run: uv run pytest -q
+      - name: Fetch public schedules and generate reports
+        env:
+          MULTISCHEDULER_SLACK_WEBHOOK_URL: ''
+        run: uv run multischeduler --days 7 --max-start-gap-hours 1.5 --output-dir generated
+      - name: Validate freshness and stage public files only
+        run: uv run python -m multischeduler.public_site generated _site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy public calendar
+        id: deployment
+        uses: actions/deploy-pages@v4

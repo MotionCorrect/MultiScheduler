@@ -20,6 +20,7 @@ class ActivityEvent:
     longitude: float | None = None
     address: str | None = None
     raw: dict | None = None
+    booking_url: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

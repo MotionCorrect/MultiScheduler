@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 import http.cookiejar
 import json
@@ -44,6 +44,27 @@ BADMINTON = PerfectMindCalendar(
 )
 
 
+# The City's full-schedule link uses the general widget. The lane widget
+# filters on the SERVER even when our client keyword is None.
+SWIMMING = replace(
+    LANE_SWIM, source="swimming", keyword=None, widget_id=BADMINTON.widget_id,
+    page_path=f"/Contacts/BookMe4BookingPages/Classes?calendarId={LANE_SWIM.calendar_id}&widgetId={BADMINTON.widget_id}&embed=False",
+    api_path=BADMINTON.api_path,
+)
+
+
+def class_url(calendar: PerfectMindCalendar, raw: dict) -> str | None:
+    if not raw.get("EventId") or not raw.get("OccurrenceDate"):
+        return None
+    # Observed on the public page's onBookButtonClick template.
+    prefix = calendar.page_path.split('/BookMe4BookingPages/')[0]
+    query = dict(widgetId=calendar.widget_id, redirectedFromEmbededMode="False",
+                 classId=raw['EventId'], occurrenceDate=raw['OccurrenceDate'])
+    if 'singleCalendarWidget=true' in calendar.page_path:
+        query['singleCalendarWidget'] = 'True'
+    return BASE_URL + prefix + '/BookMe4LandingPages/Class?' + urllib.parse.urlencode(query)
+
+
 class PerfectMindClient:
     def __init__(self, base_url: str = BASE_URL, timeout: int = 30) -> None:
         self.base_url = base_url.rstrip("/")
@@ -56,13 +77,14 @@ class PerfectMindClient:
         events: list[ActivityEvent] = []
         page = 0
         after = ""
+        date_string = start.strftime('%Y-%m-%d')
         while page < max_pages:
             payload = {
                 "__RequestVerificationToken": token,
                 "calendarId": calendar.calendar_id,
                 "widgetId": calendar.widget_id,
-                "page": str(page),
-                "dateString": start.strftime("%Y-%m-%d"),
+                "page": "0",  # public controller keeps this zero while advancing dateString
+                "dateString": date_string,
                 "values": "[]",
                 "after": after,
             }
@@ -72,7 +94,7 @@ class PerfectMindClient:
                 if calendar.keyword and calendar.keyword not in str(item.get("EventName", "")).lower():
                     continue
                 try:
-                    event = event_from_perfectmind_class(item, source=calendar.source)
+                    event = replace(event_from_perfectmind_class(item, source=calendar.source), booking_url=class_url(calendar, item))
                 except (KeyError, ValueError, TypeError):
                     continue
                 if start <= event.start < end:
@@ -85,8 +107,17 @@ class PerfectMindClient:
             if latest >= end:
                 break
             after = str(next_key)
+            # Match ClassBookingV2Controller.loadItems: advance to the day
+            # after classesMaxEndDate, rather than repeatedly querying day one.
+            covered = str(data.get('classesMaxEndDateString') or next_key)[:10]
+            date_string = (datetime.strptime(covered, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+            if date_string >= end.strftime('%Y-%m-%d'):
+                break
             page += 1
-        return sorted(events, key=lambda event: (event.start, event.name, event.location or ""))
+        else:
+            raise RuntimeError('PerfectMind pagination limit reached before the requested window was covered')
+        unique = {(e.event_id, e.start, e.name, e.location): e for e in events}
+        return sorted(unique.values(), key=lambda event: (event.start, event.name, event.location or ""))
 
     def _load_anti_forgery_token(self, page_path: str) -> str:
         html = self._get_text(page_path)
