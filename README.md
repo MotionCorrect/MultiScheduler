@@ -19,7 +19,7 @@ uv run multischeduler --days 7 --output-dir generated
 uv run python -m multischeduler.public_site generated _site
 ```
 
-Use a fresh `_site` directory for each build. Open `_site/index.html` directly or serve it using `python -m http.server --directory _site`.
+Use a fresh `_site` directory for each build. The full build also needs Poppler's `pdftotext` executable for the YMCA PDF (Ubuntu: `sudo apt-get install poppler-utils`; the hosted workflow installs it automatically). Open `_site/index.html` directly or serve it using `python -m http.server --directory _site`.
 
 ## License and sources
 
